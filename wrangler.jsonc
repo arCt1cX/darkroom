@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "darkroom",
+  "main": "src/worker.js",
+  "compatibility_date": "2025-06-01",
+
+  // PWA statica servita dallo stesso Worker (niente progetto Pages separato)
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "none"
+  },
+
+  // Unico storage: R2. Consistenza forte + egress gratuito.
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "darkroom-files"
+    }
+  ],
+
+  // Pulizia stanze scadute, ogni ora
+  "triggers": {
+    "crons": ["17 * * * *"]
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}
