@@ -1,9 +1,9 @@
 {
-  "name": "darkroom",
+  "name": "drewshare",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Trasferimento file effimero, cifrato end-to-end, su Cloudflare Workers + R2",
+  "description": "Trasferimento file effimero, cifrato end-to-end, su Cloudflare Workers + Durable Objects",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",

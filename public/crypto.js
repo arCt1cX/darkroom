@@ -1,5 +1,5 @@
 /**
- * Darkroom - crittografia lato client.
+ * DrewShare - crittografia lato client.
  *
  * Il codice della stanza e' insieme indirizzo e chiave:
  *   roomId = SHA-256("darkroom-room-v1|" + CODICE)      -> va al server
@@ -7,6 +7,12 @@
  *
  * Il server riceve solo roomId: da li' non si torna al codice, quindi non si
  * torna alla chiave. Chi non ha il codice vede blob opachi e nient'altro.
+ *
+ * Le due stringhe "darkroom-*-v1" sono etichette di dominio congelate: entrano
+ * nell'hash, quindi cambiarle cambierebbe l'indirizzo e la chiave di ogni
+ * stanza. Le stanze aperte prima di un rinomino diventerebbero irraggiungibili
+ * e i vecchi client in cache non troverebbero piu' quelle nuove. Restano
+ * com'erano: non compaiono da nessuna parte nell'interfaccia.
  */
 
 export const ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; // niente 0 1 I O

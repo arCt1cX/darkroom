@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Darkroom</title>
-<meta name="description" content="Passa foto e file dal telefono al computer. Cifrati end-to-end, originali intatti, cancellati da soli.">
+<title>DrewShare</title>
+<meta name="description" content="Passa file da un dispositivo all'altro. Cifrati end-to-end, originali intatti, cancellati da soli.">
 <meta name="theme-color" content="#0b0a09">
 <meta name="color-scheme" content="dark">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Darkroom">
+<meta name="apple-mobile-web-app-title" content="DrewShare">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -20,7 +20,7 @@
 <div class="safelight" aria-hidden="true"></div>
 
 <header class="topbar">
-  <a class="brand" href="#/" aria-label="Darkroom, home">
+  <a class="brand" href="#/" data-i18n-attr="aria-label:app.brandAria">
     <svg viewBox="0 0 64 64" width="21" height="21" aria-hidden="true" class="mark">
       <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
         <circle cx="32" cy="32" r="22"/>
@@ -30,9 +30,12 @@
       </g>
       <circle cx="32" cy="32" r="6" fill="currentColor"/>
     </svg>
-    <span>Darkroom</span>
+    <span>DrewShare</span>
   </a>
-  <span class="tag">cifrato end&#8209;to&#8209;end</span>
+  <div class="topbar-end">
+    <span class="tag" data-i18n="app.tag"></span>
+    <div class="lang" id="lang" role="group" data-i18n-attr="aria-label:app.langAria"></div>
+  </div>
 </header>
 
 <main id="app">
@@ -40,33 +43,35 @@
   <!-- ------------------------------------------------------------ home -->
   <section class="view" id="view-home">
     <div class="hero">
-      <h1>Trasferimento file temporaneo,<br>cifrato end&#8209;to&#8209;end.</h1>
-      <p class="lede">
-        Si apre una stanza dal telefono, si caricano foto e video, si recuperano dal
-        computer scrivendo il codice. I file arrivano identici all&rsquo;originale e
-        vengono cancellati alla scadenza scelta.
-      </p>
+      <h1 data-i18n-html="home.title"></h1>
+      <p class="lede" data-i18n="home.lede"></p>
     </div>
+
+    <section class="recents" id="recents" hidden>
+      <span class="recents-label" data-i18n="recents.h"></span>
+      <div class="recents-list" id="recents-list"></div>
+      <small class="recents-note" data-i18n="recents.note"></small>
+    </section>
 
     <div class="panes">
       <section class="pane pane-create">
         <span class="pane-num">01</span>
-        <h2>Apri una stanza</h2>
-        <p>Durata della stanza. Allo scadere i file vengono rimossi dallo storage.</p>
-        <div class="ttl" id="ttl" role="radiogroup" aria-label="Durata della stanza"></div>
+        <h2 data-i18n="home.create.h"></h2>
+        <p data-i18n="home.create.p"></p>
+        <div class="ttl" id="ttl" role="radiogroup" data-i18n-attr="aria-label:home.create.ttlAria"></div>
         <button class="btn primary" id="btn-create" type="button">
-          <span>Apri la stanza</span>
+          <span data-i18n="home.create.btn"></span>
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </section>
 
       <section class="pane pane-join">
         <span class="pane-num">02</span>
-        <h2>Entra con il codice</h2>
-        <p>Sei caratteri, maiuscole e minuscole indifferenti. Si possono incollare in blocco.</p>
-        <div class="code-input" id="code-input" role="group" aria-label="Codice della stanza"></div>
+        <h2 data-i18n="home.join.h"></h2>
+        <p data-i18n="home.join.p"></p>
+        <div class="code-input" id="code-input" role="group" data-i18n-attr="aria-label:home.join.codeAria"></div>
         <button class="btn" id="btn-join" type="button" disabled>
-          <span>Entra</span>
+          <span data-i18n="home.join.btn"></span>
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </section>
@@ -74,16 +79,16 @@
 
     <ul class="facts">
       <li>
-        <h3>Nessuna ricompressione</h3>
-        <p>I byte vengono trasferiti invariati: risoluzione, EXIF e profilo colore restano quelli della fotocamera. Un&rsquo;impronta SHA&#8209;256 viene verificata al download.</p>
+        <h3 data-i18n="facts.1.h"></h3>
+        <p data-i18n="facts.1.p"></p>
       </li>
       <li>
-        <h3>Cifratura sul dispositivo</h3>
-        <p>AES&#8209;256&#8209;GCM con chiave derivata dal codice via PBKDF2. Al server arriva solo un hash del codice: contenuti e nomi dei file restano illeggibili.</p>
+        <h3 data-i18n="facts.2.h"></h3>
+        <p data-i18n="facts.2.p"></p>
       </li>
       <li>
-        <h3>Cancellazione automatica</h3>
-        <p>Ogni stanza registra la propria scadenza alla creazione e si cancella da sola quando la raggiunge. I singoli file si possono rimuovere prima.</p>
+        <h3 data-i18n="facts.3.h"></h3>
+        <p data-i18n="facts.3.p"></p>
       </li>
     </ul>
   </section>
@@ -92,13 +97,13 @@
   <section class="view" id="view-room" hidden>
     <div class="room-head">
       <div class="room-id">
-        <span class="label">Codice stanza</span>
+        <span class="label" data-i18n="room.codeLabel"></span>
         <div class="room-code" id="room-code">&nbsp;</div>
       </div>
       <div class="room-actions">
-        <button class="btn ghost" id="btn-copy-code" type="button">Copia codice</button>
-        <button class="btn ghost" id="btn-copy-link" type="button">Copia link</button>
-        <button class="btn ghost danger" id="btn-leave" type="button">Esci</button>
+        <button class="btn ghost" id="btn-copy-code" type="button" data-i18n="room.copyCode"></button>
+        <button class="btn ghost" id="btn-copy-link" type="button" data-i18n="room.copyLink"></button>
+        <button class="btn ghost danger" id="btn-leave" type="button" data-i18n="room.leave"></button>
       </div>
     </div>
 
@@ -113,19 +118,19 @@
         <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
         <path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
       </svg>
-      <strong>Scegli foto, video o altri file</strong>
-      <span>oppure trascinali qui dentro</span>
-      <small>La cifratura avviene sul dispositivo prima dell&rsquo;invio. I file originali non vengono modificati.</small>
+      <strong data-i18n="drop.title"></strong>
+      <span data-i18n="drop.sub"></span>
+      <small data-i18n="drop.note"></small>
     </label>
 
     <section class="queue" id="queue" hidden aria-live="polite"></section>
 
     <section class="files">
       <div class="files-head">
-        <h2>Nella stanza <span class="count" id="file-count"></span></h2>
-        <button class="btn ghost" id="btn-zip" type="button" hidden>Scarica tutto (.zip)</button>
+        <h2><span data-i18n="files.h"></span> <span class="count" id="file-count"></span></h2>
+        <button class="btn ghost" id="btn-zip" type="button" hidden data-i18n="files.zip"></button>
       </div>
-      <p class="empty" id="empty">Ancora niente qui dentro.</p>
+      <p class="empty" id="empty" data-i18n="files.empty"></p>
       <div class="grid" id="grid"></div>
     </section>
   </section>
@@ -133,9 +138,9 @@
 </main>
 
 <footer class="foot">
-  <span>Darkroom</span>
+  <span>DrewShare</span>
   <span class="sep">&middot;</span>
-  <span>storage cifrato su Cloudflare, per la durata impostata</span>
+  <span data-i18n="foot.storage"></span>
 </footer>
 
 <div class="viewer" id="viewer" hidden>
@@ -145,17 +150,17 @@
       <span class="viewer-meta" id="viewer-meta"></span>
     </div>
     <div class="viewer-tools">
-      <button class="btn ghost tiny" id="viewer-download" type="button">Scarica</button>
-      <button class="btn ghost tiny" id="viewer-close" type="button">Chiudi</button>
+      <button class="btn ghost tiny" id="viewer-download" type="button" data-i18n="viewer.download"></button>
+      <button class="btn ghost tiny" id="viewer-close" type="button" data-i18n="viewer.close"></button>
     </div>
   </div>
 
   <div class="viewer-stage" id="viewer-stage"></div>
 
-  <button class="viewer-nav prev" id="viewer-prev" type="button" aria-label="Precedente">
+  <button class="viewer-nav prev" id="viewer-prev" type="button" data-i18n-attr="aria-label:viewer.prev">
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
-  <button class="viewer-nav next" id="viewer-next" type="button" aria-label="Successivo">
+  <button class="viewer-nav next" id="viewer-next" type="button" data-i18n-attr="aria-label:viewer.next">
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
 </div>

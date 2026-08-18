@@ -1,4 +1,4 @@
-/* Darkroom - una camera oscura: buio caldo, una sola luce rossa. */
+/* DrewShare - buio caldo, una sola luce di sicurezza. */
 
 :root {
   --bg:        #0b0a09;
@@ -21,6 +21,17 @@
 
   --r: 14px;
   --pad: clamp(20px, 5vw, 40px);
+
+  /* Tacca, Dynamic Island e barra gesti: su iPhone la pagina sta sotto (il
+     viewport e' viewport-fit=cover), quindi ogni bordo si scosta da solo.
+     Il fallback a 0px serve ai browser che non conoscono env(). */
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+
+  --pad-l: calc(var(--pad) + var(--sal));
+  --pad-r: calc(var(--pad) + var(--sar));
 }
 
 * { box-sizing: border-box; }
@@ -72,7 +83,7 @@ main, .topbar, .foot { position: relative; z-index: 1; }
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 20px var(--pad) 0;
+  padding: calc(20px + var(--sat)) var(--pad-r) 0 var(--pad-l);
   max-width: 1120px;
   width: 100%;
   margin: 0 auto;
@@ -99,6 +110,36 @@ main, .topbar, .foot { position: relative; z-index: 1; }
 
 @media (max-width: 560px) { .tag { display: none; } }
 
+.topbar-end { display: flex; align-items: center; gap: 12px; flex: none; }
+
+/* Selettore di lingua: due pulsanti, quello attivo in negativo. */
+.lang {
+  display: inline-flex;
+  border: 1px solid var(--line-warm);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.lang-btn {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  padding: 7px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: color .15s, background .15s;
+}
+
+.lang-btn:hover { color: var(--ink); }
+
+.lang-btn[aria-pressed="true"] {
+  color: var(--bg);
+  background: var(--ink);
+}
+
 /* ------------------------------------------------------------------ base */
 
 #app {
@@ -106,7 +147,7 @@ main, .topbar, .foot { position: relative; z-index: 1; }
   width: 100%;
   max-width: 1120px;
   margin: 0 auto;
-  padding: clamp(36px, 7vw, 72px) var(--pad) 64px;
+  padding: clamp(36px, 7vw, 72px) var(--pad-r) 64px var(--pad-l);
 }
 
 h1, h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.015em; margin: 0; }
@@ -126,6 +167,78 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.015e
   font-size: clamp(16px, 2.2vw, 18px);
   max-width: 44ch;
 }
+
+/* ------------------------------------------------------- stanze recenti */
+
+.recents {
+  margin-top: clamp(30px, 4.5vw, 40px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.recents[hidden] { display: none; }
+
+.recents-label {
+  font-size: 11px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.recents-list { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Pillola in due parti: il grosso entra, la × dimentica. Sono due pulsanti
+   affiancati, non uno dentro l'altro. */
+.recent {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--line-warm);
+  border-radius: 999px;
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color .15s;
+}
+
+.recent:hover { border-color: var(--ink-faint); }
+
+.recent-enter {
+  font: inherit;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 8px 6px 8px 15px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.recent-code {
+  font-family: var(--mono);
+  font-size: 14px;
+  letter-spacing: .08em;
+}
+
+.recent-left { font-size: 12px; color: var(--ink-faint); white-space: nowrap; }
+
+.recent-forget {
+  font: inherit;
+  font-size: 17px;
+  line-height: 1;
+  padding: 0 13px 2px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  transition: color .15s, background .15s;
+}
+
+.recent-forget:hover { color: var(--safe); background: rgba(255, 78, 51, .08); }
+
+.recents-note { font-size: 12px; color: var(--ink-faint); max-width: 46ch; }
 
 /* ----------------------------------------------------------------- panes */
 
@@ -485,12 +598,12 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.015e
 .toasts {
   position: fixed;
   left: 50%;
-  bottom: 22px;
+  bottom: calc(22px + var(--sab));
   translate: -50% 0;
   z-index: 20;
   display: grid;
   gap: 8px;
-  width: min(440px, calc(100vw - 32px));
+  width: min(440px, calc(100vw - 32px - var(--sal) - var(--sar)));
 }
 
 .toast {
@@ -512,7 +625,7 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.015e
 /* ------------------------------------------------------------------ foot */
 
 .foot {
-  padding: 26px var(--pad) 34px;
+  padding: 26px var(--pad-r) calc(34px + var(--sab)) var(--pad-l);
   max-width: 1120px;
   width: 100%;
   margin: 0 auto;
@@ -551,7 +664,8 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.015e
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 14px clamp(14px, 3vw, 26px);
+  padding: calc(14px + var(--sat)) calc(clamp(14px, 3vw, 26px) + var(--sar)) 14px
+    calc(clamp(14px, 3vw, 26px) + var(--sal));
   border-bottom: 1px solid var(--line);
   min-width: 0;
 }
@@ -574,7 +688,8 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.015e
   position: relative;
   display: grid;
   place-items: center;
-  padding: clamp(12px, 2.5vw, 28px);
+  padding: clamp(12px, 2.5vw, 28px) calc(clamp(12px, 2.5vw, 28px) + var(--sar))
+    calc(clamp(12px, 2.5vw, 28px) + var(--sab)) calc(clamp(12px, 2.5vw, 28px) + var(--sal));
   min-height: 0;
   overflow: hidden;
 }
@@ -645,8 +760,8 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.015e
 
 .viewer-nav:hover { color: var(--ink); border-color: var(--ink-faint); }
 .viewer-nav[hidden] { display: none; }
-.viewer-nav.prev { left: clamp(8px, 2vw, 22px); }
-.viewer-nav.next { right: clamp(8px, 2vw, 22px); }
+.viewer-nav.prev { left: calc(clamp(8px, 2vw, 22px) + var(--sal)); }
+.viewer-nav.next { right: calc(clamp(8px, 2vw, 22px) + var(--sar)); }
 
 /* La miniatura e' cliccabile: apre il file a schermo intero. */
 .card-open {

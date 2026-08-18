@@ -1,11 +1,18 @@
-# Darkroom
+# DrewShare
 
-Passare foto e video dal telefono al computer senza cavi, senza account, senza
-mandarli a se stessi su WhatsApp e ritrovarseli ricompressi.
+Passare file da un dispositivo all'altro senza cavi, senza account, senza
+mandarli a se stessi su WhatsApp e ritrovarseli ricompressi. Due telefoni, due
+computer, un telefono e un portatile altrui: la direzione non conta.
 
-Apri una stanza dal telefono, ottieni un codice di sei caratteri, ci butti
-dentro foto e video. Dal computer scrivi lo stesso codice e te li riprendi. Scaduto il
-tempo che hai scelto, la stanza si dissolve.
+Apri una stanza su un dispositivo, ottieni un codice di sei caratteri, ci butti
+dentro quello che serve. Dall'altro dispositivo scrivi lo stesso codice e te lo
+riprendi. Scaduto il tempo che hai scelto, la stanza si dissolve.
+
+L'interfaccia è in italiano e in inglese, con lo switch in alto a destra: la
+prima volta segue la lingua del browser, poi ricorda la scelta.
+
+Chiudere il sito non chiude la stanza: riaprendolo, le stanze ancora vive sono
+in cima alla home e si rientra con un tocco.
 
 Gira interamente su Cloudflare (Worker + Durable Objects), dentro il piano
 gratuito e **senza metodo di pagamento**.
@@ -16,7 +23,7 @@ gratuito e **senza metodo di pagamento**.
 
 **Gli originali restano originali.** I byte del file vengono spediti così come
 sono: niente `canvas`, niente ridimensionamento, niente ricompressione. EXIF,
-profilo colore e data di scatto arrivano intatti. Ogni file porta con sé
+profilo colore e data arrivano intatti. Ogni file porta con sé
 un'impronta SHA-256 calcolata prima della partenza e riverificata dopo il
 download: se un byte fosse cambiato, l'app lo direbbe.
 
@@ -27,6 +34,10 @@ browser. Da lì si ricavano due cose diverse:
 roomId = SHA-256("darkroom-room-v1|" + CODICE)      -> questo va al server
 chiave = PBKDF2(CODICE, salt = SHA-256("darkroom-salt-v1|" + CODICE), 250k)
 ```
+
+(Le etichette `darkroom-*-v1` sono un residuo del nome precedente, congelato di
+proposito: entrano nell'hash, quindi cambiarle renderebbe irraggiungibili le
+stanze già aperte. Non compaiono da nessuna parte nell'interfaccia.)
 
 Il server riceve solo `roomId`, e da un hash non si torna indietro al codice.
 Contenuti, nomi dei file, tipo MIME e impronte viaggiano cifrati in
@@ -49,7 +60,7 @@ limite di 128 KiB per valore) e riletto in ordine in streaming.
 Perché non R2: attivarlo richiede un metodo di pagamento sulla dashboard, anche
 restando dentro il piano gratuito. Le Durable Objects sono incluse nel piano
 Free dal 2025 e non chiedono nulla. In cambio danno pure consistenza forte —
-niente propagazione da aspettare fra il telefono che carica e il computer che
+niente propagazione da aspettare fra il dispositivo che carica e quello che
 guarda — e la scadenza precisa via `alarm()`.
 
 Limiti attuali del piano Free, per orientarsi: 5 GB di storage complessivo,
@@ -70,15 +81,17 @@ npx wrangler deploy
 Fine — la Durable Object nasce da sola con la migrazione dichiarata in
 `wrangler.jsonc`, non c'è niente da creare a mano. Wrangler stampa l'indirizzo,
 del tipo
-`https://darkroom.<tuo-sottodominio>.workers.dev`. La PWA e l'API stanno nello
-stesso Worker: niente progetto Pages separato da collegare.
+`https://darkroom.<tuo-sottodominio>.workers.dev` — il Worker si chiama ancora
+`darkroom` in `wrangler.jsonc`, e cambiargli nome vorrebbe dire crearne uno
+nuovo e rifare dominio e route, quindi è rimasto com'era. La PWA e l'API stanno
+nello stesso Worker: niente progetto Pages separato da collegare.
 
 ### Dominio tuo (facoltativo)
 
 Se hai un dominio su Cloudflare, aggiungi in `wrangler.jsonc`:
 
 ```jsonc
-"routes": [{ "pattern": "darkroom.tuodominio.it", "custom_domain": true }]
+"routes": [{ "pattern": "drewshare.tuodominio.it", "custom_domain": true }]
 ```
 
 e rilancia `npx wrangler deploy`.
@@ -101,11 +114,13 @@ Workers*.
 
 ## Come si usa
 
-1. **Telefono** — apri il sito, scegli la durata, `Apri la stanza`. Compare un
-   codice tipo `K7Q-M3X`.
-2. Tocca `Scegli i file` e prendi le foto dalla galleria. Puoi continuare ad
-   aggiungerne finché la stanza è viva.
-3. **Computer** — apri lo stesso sito, scrivi il codice, `Entra`. Trovi tutto lì.
+1. **Dispositivo che manda** — apri il sito, scegli la durata, `Apri la stanza`.
+   Compare un codice tipo `K7Q-M3X`.
+2. Scegli i file (dalla galleria, dal disco, trascinandoli dentro o
+   incollandoli). Puoi continuare ad aggiungerne finché la stanza è viva.
+3. **Dispositivo che riceve** — che sia un altro telefono, un computer o il
+   portatile di qualcun altro: apri lo stesso sito, scrivi il codice, `Entra`.
+   Trovi tutto lì.
    Clicca su una miniatura per aprire il file a schermo intero: le foto si
    guardano, i video si riproducono, si passa da uno all'altro con le frecce.
    `Scarica` prende il singolo file, `Scarica tutto (.zip)` l'intero blocco.
@@ -113,15 +128,26 @@ Workers*.
 `Copia link` mette negli appunti un indirizzo che contiene già il codice: chi ce
 l'ha entra senza digitare niente. Comodo, ma trattalo come una chiave, perché lo è.
 
+**Stanze recenti.** Ogni stanza in cui entri resta annotata in `localStorage`
+(le ultime sei), e sulla home compare come pastiglia con il tempo che le resta:
+un tocco e sei dentro, senza ridigitare il codice. Serve proprio a questo — dal
+PC ti prendi i file, dal telefono ne aggiungi altri, e nessuno dei due deve
+ricordarsi niente. Le stanze scadute spariscono da sole; la × le toglie subito.
+
+Il codice però *è* la chiave, quindi lì dentro resta in chiaro: chi mette le
+mani su quel dispositivo rientra nelle stanze ancora vive. Su un computer non
+tuo, usa la × quando hai finito.
+
 Sul telefono conviene installarla come app: dal menù del browser,
-*Aggiungi a schermata Home*.
+*Aggiungi a schermata Home*. In quella modalità la pagina occupa tutto lo
+schermo e tiene conto da sola di tacca, Dynamic Island e barra dei gesti.
 
 ---
 
 ## Note pratiche
 
 **iPhone e HEIC.** Scegliendo le foto dal picker *Foto*, iOS a volte converte in
-JPEG prima di consegnare il file all'app: in quel caso Darkroom riceve già un
+JPEG prima di consegnare il file all'app: in quel caso DrewShare riceve già un
 JPEG e lo spedisce intatto, ma l'HEIC originale non è mai arrivato. Per avere il
 file esatto, usa la voce *Sfoglia*/*File* del picker, oppure disattiva
 Impostazioni → Foto → *Trasferisci su Mac o PC* → **Mantieni originali**. Su
@@ -177,7 +203,7 @@ node tools/e2e-test.mjs http://127.0.0.1:8787
 
 Cifra, carica, riscarica, decifra e confronta i byte uno per uno, prova la
 chiave sbagliata, i metadati, lo zip e la cancellazione. Con
-`DARKROOM_TEST_BIG=1` aggiunge un file da 60 MB spedito in undici pezzi.
+`DREWSHARE_TEST_BIG=1` aggiunge un file da 60 MB spedito in undici pezzi.
 
 ## Struttura
 
@@ -186,6 +212,8 @@ src/worker.js        smistamento + la Durable Object. Vede solo blob opachi.
 public/index.html    la pagina, unica
 public/app.js        stanze, upload, download, anteprime
 public/crypto.js     derivazione della chiave e cifratura a blocchi
+public/i18n.js       dizionari italiano/inglese e traduzione della pagina
+public/recents.js    le ultime stanze visitate, per rientrarci senza codice
 public/zip.js        archivio "store", senza ricomprimere niente
 public/sw.js         service worker: in cache il guscio, mai i file
 tools/gen-icons.mjs  icone PNG generate senza dipendenze

@@ -14,17 +14,13 @@ import {
   sealMeta,
 } from "./crypto.js";
 import { buildZip, uniqueNames } from "./zip.js";
+import { LANGS, LANG_NAMES, applyStatic, getLang, setLang, t } from "./i18n.js";
+import { forgetRoom, recentRooms, rememberRoom } from "./recents.js";
 
 const $ = (sel) => document.querySelector(sel);
 
-const TTLS = [
-  { s: 900, label: "15 min" },
-  { s: 1800, label: "30 min" },
-  { s: 3600, label: "1 ora" },
-  { s: 21600, label: "6 ore" },
-  { s: 86400, label: "24 ore" },
-  { s: 259200, label: "3 giorni" },
-];
+/* Le etichette vivono nel dizionario: qui restano solo i secondi. */
+const TTLS = [900, 1800, 3600, 21600, 86400, 259200];
 
 const state = {
   room: null, // { code, roomId, key }
@@ -77,6 +73,7 @@ function countdown(ms) {
 function showView(name) {
   $("#view-home").hidden = name !== "home";
   $("#view-room").hidden = name !== "room";
+  if (name === "home") renderRecents();
   window.scrollTo({ top: 0 });
 }
 
@@ -111,34 +108,35 @@ async function api(path, options) {
   return data;
 }
 
-const ERRORS = {
-  room_not_found: "Stanza inesistente o gia' scaduta.",
-  file_too_large: "File troppo grande per una stanza.",
-  incomplete_upload: "Trasferimento interrotto, riprova.",
-  file_not_found: "Il file non c'e' piu'.",
-  room_exists: "Codice gia' in uso, riprova.",
-  room_full: "Stanza piena.",
-  room_quota: "Spazio della stanza esaurito.",
-  slow_down: "Troppe richieste, aspetta un attimo.",
-  network: "Connessione interrotta.",
-};
+const KNOWN_ERRORS = [
+  "room_not_found",
+  "file_too_large",
+  "incomplete_upload",
+  "file_not_found",
+  "room_exists",
+  "room_full",
+  "room_quota",
+  "slow_down",
+  "network",
+];
 
-const explain = (err) => ERRORS[err.message] || "Qualcosa e' andato storto (" + err.message + ").";
+const explain = (err) =>
+  KNOWN_ERRORS.includes(err.message) ? t("err." + err.message) : t("err.generic", { code: err.message });
 
 /* ------------------------------------------------------------------ home */
 
 function buildTtlChips() {
   const box = $("#ttl");
   box.innerHTML = "";
-  for (const opt of TTLS) {
+  for (const seconds of TTLS) {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "chip";
     chip.setAttribute("role", "radio");
-    chip.textContent = opt.label;
-    chip.setAttribute("aria-checked", String(opt.s === chosenTtl));
+    chip.textContent = t("ttl." + seconds);
+    chip.setAttribute("aria-checked", String(seconds === chosenTtl));
     chip.onclick = () => {
-      chosenTtl = opt.s;
+      chosenTtl = seconds;
       for (const other of box.children) other.setAttribute("aria-checked", String(other === chip));
     };
     box.append(chip);
@@ -165,7 +163,7 @@ function buildCodeInput() {
     cell.autocapitalize = "characters";
     cell.spellcheck = false;
     cell.inputMode = "text";
-    cell.setAttribute("aria-label", "Carattere " + (i + 1));
+    cell.setAttribute("aria-label", t("home.join.cellAria", { n: i + 1 }));
 
     cell.oninput = () => {
       cell.value = normalizeCode(cell.value).slice(-1);
@@ -200,7 +198,115 @@ function buildCodeInput() {
     box.append(cell);
   }
 
-  return { read: readAll, focus: () => cells[0].focus(), clear: () => cells.forEach((c) => (c.value = "")) };
+  return {
+    read: readAll,
+    focus: () => cells[0].focus(),
+    clear: () => cells.forEach((c) => (c.value = "")),
+    relabel: () =>
+      cells.forEach((c, k) => c.setAttribute("aria-label", t("home.join.cellAria", { n: k + 1 }))),
+  };
+}
+
+/* ------------------------------------------------------- stanze recenti */
+
+/**
+ * Le stanze aperte di recente e non ancora scadute: un tocco e si rientra,
+ * senza ridigitare il codice. Il tempo che resta si aggiorna da solo.
+ */
+function renderRecents() {
+  const box = $("#recents");
+  const list = $("#recents-list");
+  const rooms = recentRooms();
+
+  box.hidden = rooms.length === 0;
+  list.innerHTML = "";
+
+  for (const room of rooms) {
+    const pill = document.createElement("div");
+    pill.className = "recent";
+
+    const enter = document.createElement("button");
+    enter.type = "button";
+    enter.className = "recent-enter";
+
+    const code = document.createElement("span");
+    code.className = "recent-code";
+    code.textContent = formatCode(room.code);
+
+    const left = document.createElement("span");
+    left.className = "recent-left";
+    left.textContent = t("recents.left", { t: countdown(room.expiresAt - Date.now()) });
+
+    enter.append(code, left);
+    enter.onclick = () => {
+      // Passare dall'hash tiene insieme cronologia e rotta: ci pensa route().
+      const target = "#/r/" + room.code;
+      if (location.hash === target) joinRoom(room.code);
+      else location.hash = target;
+    };
+
+    const drop = document.createElement("button");
+    drop.type = "button";
+    drop.className = "recent-forget";
+    drop.textContent = "×";
+    const label = t("recents.forget", { code: formatCode(room.code) });
+    drop.title = label;
+    drop.setAttribute("aria-label", label);
+    drop.onclick = () => {
+      forgetRoom(room.code);
+      renderRecents();
+    };
+
+    pill.append(enter, drop);
+    list.append(pill);
+  }
+}
+
+/* ----------------------------------------------------------------- lingua */
+
+function buildLangSwitch(onChange) {
+  const box = $("#lang");
+  box.innerHTML = "";
+  for (const lang of LANGS) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "lang-btn";
+    btn.textContent = lang.toUpperCase();
+    btn.title = LANG_NAMES[lang];
+    btn.setAttribute("aria-pressed", String(lang === getLang()));
+    btn.onclick = () => {
+      if (!setLang(lang)) return;
+      for (const other of box.children) other.setAttribute("aria-pressed", String(other === btn));
+      onChange();
+    };
+    box.append(btn);
+  }
+}
+
+/**
+ * Cambio di lingua a pagina viva: il markup statico si ridipinge da solo, il
+ * resto (chip, griglia, timer, visualizzatore) va rifatto a mano perche' e'
+ * costruito da JavaScript.
+ */
+function retranslate(codeInput) {
+  applyStatic();
+  buildTtlChips();
+  codeInput.relabel();
+  renderRecents();
+
+  if (!state.room) return;
+  renderGrid();
+  if (state.clock) startClock();
+  if (viewer.open) {
+    const f = state.files[viewer.index];
+    if (f) {
+      $("#viewer-meta").textContent = t("viewer.meta", {
+        size: humanSize(f.size),
+        i: viewer.index + 1,
+        n: state.files.length,
+      });
+    }
+  }
 }
 
 /* ------------------------------------------------------------ stanze */
@@ -208,7 +314,7 @@ function buildCodeInput() {
 async function createRoom() {
   const btn = $("#btn-create");
   btn.disabled = true;
-  btn.querySelector("span").textContent = "Apertura...";
+  btn.querySelector("span").textContent = t("home.create.btnBusy");
   try {
     for (let attempt = 0; attempt < 4; attempt++) {
       const room = await deriveRoom(randomCode());
@@ -229,23 +335,24 @@ async function createRoom() {
     toast(explain(err));
   } finally {
     btn.disabled = false;
-    btn.querySelector("span").textContent = "Apri la stanza";
+    btn.querySelector("span").textContent = t("home.create.btn");
   }
 }
 
 async function joinRoom(rawCode, { silent = false } = {}) {
   const btn = $("#btn-join");
   btn.disabled = true;
-  btn.querySelector("span").textContent = "Apertura...";
+  btn.querySelector("span").textContent = t("home.join.btnBusy");
   try {
     const room = await deriveRoom(rawCode);
     const res = await api("/room/" + room.roomId);
     await enterRoom(room, res);
   } catch (err) {
+    if (err.message === "room_not_found") forgetRoom(normalizeCode(rawCode));
     if (!silent) toast(explain(err));
     location.hash = "#/";
   } finally {
-    btn.querySelector("span").textContent = "Entra";
+    btn.querySelector("span").textContent = t("home.join.btn");
     btn.disabled = false;
   }
 }
@@ -256,6 +363,8 @@ async function enterRoom(room, info) {
   state.ttl = info.ttl;
   state.files = [];
   state.thumbs.clear();
+
+  rememberRoom(room.code, info.expiresAt);
 
   $("#room-code").textContent = formatCode(room.code);
   showView("room");
@@ -289,12 +398,13 @@ function startClock() {
     const left = state.expiresAt - Date.now();
     if (left <= 0) {
       clearInterval(state.clock);
-      toast("Stanza scaduta. I file sono stati cancellati.");
+      toast(t("room.expired"));
+      if (state.room) forgetRoom(state.room.code);
       leaveRoom();
       return;
     }
     $("#timer-fill").style.transform = "scaleX(" + Math.min(1, left / (state.ttl * 1000)) + ")";
-    $("#timer-text").textContent = "scade tra " + countdown(left);
+    $("#timer-text").textContent = t("room.expiresIn", { t: countdown(left) });
     $(".timer").classList.toggle("urgent", left < 120000);
   };
   tick();
@@ -312,7 +422,8 @@ async function refresh() {
     await paintFiles(res.files);
   } catch (err) {
     if (err.message === "room_not_found") {
-      toast("La stanza non esiste piu'.");
+      toast(t("room.gone"));
+      forgetRoom(state.room.code);
       leaveRoom();
     }
   }
@@ -341,7 +452,9 @@ function renderGrid() {
   const grid = $("#grid");
   grid.innerHTML = "";
   const bytes = state.files.reduce((n, f) => n + f.size, 0);
-  $("#file-count").textContent = state.files.length ? state.files.length + " file · " + humanSize(bytes) : "";
+  $("#file-count").textContent = state.files.length
+    ? t("files.count", { n: state.files.length, size: humanSize(bytes) })
+    : "";
   $("#empty").hidden = state.files.length > 0;
   $("#btn-zip").hidden = state.files.length < 2;
 
@@ -370,7 +483,7 @@ function fileCard(f, index) {
   const open = document.createElement("button");
   open.type = "button";
   open.className = "card-open";
-  open.title = "Apri " + f.name;
+  open.title = t("files.open", { name: f.name });
   open.append(thumb);
   open.onclick = () => openViewer(index);
 
@@ -402,13 +515,13 @@ function fileCard(f, index) {
   const get = document.createElement("button");
   get.className = "btn ghost tiny";
   get.type = "button";
-  get.textContent = "Scarica";
+  get.textContent = t("files.download");
   get.onclick = () => downloadOne(f, card);
 
   const del = document.createElement("button");
   del.className = "btn ghost tiny danger";
   del.type = "button";
-  del.textContent = "Elimina";
+  del.textContent = t("files.delete");
   del.onclick = async () => {
     del.disabled = true;
     try {
@@ -547,7 +660,7 @@ async function encryptFile(file, key, job) {
     const slice = await file.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE).arrayBuffer();
     await digest.add(slice);
     frames.push(await encryptChunk(key, index, slice));
-    job.set("cifratura", ((index + 1) / total) * 0.4);
+    job.set(t("job.encrypting"), ((index + 1) / total) * 0.4);
   }
 
   return { frames, hash: await digest.finish() };
@@ -558,7 +671,7 @@ async function uploadFile(file) {
   const job = addJob(file.name);
 
   try {
-    job.set("cifratura", 0.02);
+    job.set(t("job.encrypting"), 0.02);
     const thumbData = await makeThumb(file);
     const { frames, hash } = await encryptFile(file, room.key, job);
 
@@ -594,14 +707,14 @@ async function uploadFile(file) {
         "/api/room/" + room.roomId + "/file/" + fileId + "?offset=" + offset,
         slice,
         {},
-        (r) => job.set("invio", 0.4 + ((base + slice.size * r) / cipher.size) * 0.55)
+        (r) => job.set(t("job.sending"), 0.4 + ((base + slice.size * r) / cipher.size) * 0.55)
       );
     }
 
     await send("POST", "/api/room/" + room.roomId + "/file/" + fileId + "/commit", null, {});
 
     if (thumbData) {
-      job.set("anteprima", 0.99);
+      job.set(t("job.thumb"), 0.99);
       const sealed = await encryptChunk(room.key, 0, thumbData);
       await send("PUT", "/api/room/" + room.roomId + "/thumb/" + fileId, new Blob([sealed]), {
         "x-dr-chunk": String(thumbData.length),
@@ -690,7 +803,7 @@ async function downloadOne(f, card) {
 }
 
 async function downloadAll() {
-  const job = addJob("Archivio di " + state.files.length + " file");
+  const job = addJob(t("job.archive", { n: state.files.length }));
   try {
     const names = uniqueNames(state.files.map((f) => f.name));
     const entries = [];
@@ -698,16 +811,16 @@ async function downloadAll() {
 
     for (let i = 0; i < state.files.length; i++) {
       const f = state.files[i];
-      job.set("scarico " + (i + 1) + "/" + state.files.length, i / state.files.length);
+      job.set(t("job.fetching", { i: i + 1, n: state.files.length }), i / state.files.length);
       const { chunks, intact } = await fetchAndDecrypt(f);
       if (!intact) broken++;
       entries.push({ name: names[i], chunks, date: f.lm ? new Date(f.lm) : new Date(f.at) });
     }
 
-    job.set("creo l'archivio", 0.98);
-    save(buildZip(entries), "darkroom-" + state.room.code.toLowerCase() + ".zip");
+    job.set(t("job.zipping"), 0.98);
+    save(buildZip(entries), "drewshare-" + state.room.code.toLowerCase() + ".zip");
     job.done();
-    if (broken) toast(broken + " file con impronta non corrispondente.");
+    if (broken) toast(t("job.broken", { n: broken }));
   } catch (err) {
     job.fail(explain(err));
   }
@@ -747,7 +860,7 @@ async function ensureBlob(f, onProgress) {
     state.blobs.delete(oldest);
   }
 
-  if (!intact) toast("Attenzione: l'impronta di " + f.name + " non combacia.");
+  if (!intact) toast(t("job.mismatch", { name: f.name }));
   return entry;
 }
 
@@ -767,7 +880,11 @@ async function openViewer(index) {
   $("#viewer").hidden = false;
   document.body.style.overflow = "hidden";
   $("#viewer-name").textContent = f.name;
-  $("#viewer-meta").textContent = humanSize(f.size) + " · " + (index + 1) + " di " + state.files.length;
+  $("#viewer-meta").textContent = t("viewer.meta", {
+    size: humanSize(f.size),
+    i: index + 1,
+    n: state.files.length,
+  });
   $("#viewer-prev").hidden = state.files.length < 2;
   $("#viewer-next").hidden = state.files.length < 2;
 
@@ -778,14 +895,15 @@ async function openViewer(index) {
   if (kind === "other") {
     const note = document.createElement("p");
     note.className = "viewer-plain";
-    note.textContent = "Questo tipo di file non si puo' mostrare nel browser. Scaricalo per aprirlo.";
+    note.textContent = t("viewer.unsupported");
     stage.append(note);
     return;
   }
 
   const wait = document.createElement("div");
   wait.className = "viewer-wait";
-  wait.innerHTML = '<span>decifratura in corso</span><span class="bar"><i></i></span>';
+  wait.innerHTML = '<span class="wait-label"></span><span class="bar"><i></i></span>';
+  wait.querySelector(".wait-label").textContent = t("viewer.decrypting");
   stage.append(wait);
   const bar = wait.querySelector("i");
 
@@ -854,8 +972,10 @@ function route() {
 }
 
 function wire() {
+  applyStatic();
   buildTtlChips();
   const codeInput = buildCodeInput();
+  buildLangSwitch(() => retranslate(codeInput));
 
   $("#btn-create").onclick = createRoom;
   $("#btn-join").onclick = () => joinRoom(codeInput.read());
@@ -891,12 +1011,12 @@ function wire() {
 
   $("#btn-copy-code").onclick = async () => {
     await navigator.clipboard.writeText(state.room.code);
-    toast("Codice copiato.", "ok");
+    toast(t("room.codeCopied"), "ok");
   };
 
   $("#btn-copy-link").onclick = async () => {
     await navigator.clipboard.writeText(location.origin + "/#/r/" + state.room.code);
-    toast("Link copiato. Chi ce l'ha entra nella stanza.", "ok");
+    toast(t("room.linkCopied"), "ok");
   };
 
   const input = $("#file-input");
@@ -935,6 +1055,10 @@ function wire() {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && state.room && !state.busy) refresh();
   });
+
+  setInterval(() => {
+    if (!$("#view-home").hidden) renderRecents();
+  }, 30000);
 
   route();
   if (!state.room) codeInput.focus();

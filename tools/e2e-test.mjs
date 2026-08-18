@@ -69,7 +69,7 @@ const concat = (parts) => {
 
 /* ------------------------------------------------------------------ prova */
 
-console.log("Darkroom e2e ->", BASE);
+console.log("DrewShare e2e ->", BASE);
 
 const code = C.randomCode();
 console.log("codice stanza:", C.formatCode(code));
@@ -197,7 +197,7 @@ check("zip: firma locale", zipBytes.readUInt32LE(0) === 0x04034b50);
 check("zip: coda centrale", zipBytes.includes(Buffer.from([0x50, 0x4b, 0x05, 0x06])));
 
 // Percorso multipart: si attiva solo oltre i 90 MiB, quindi e' opzionale.
-if (process.env.DARKROOM_TEST_BIG === "1") {
+if (process.env.DREWSHARE_TEST_BIG === "1") {
   const big = { name: "grande.bin", type: "application/octet-stream", bytes: new Uint8Array(randomBytes(60 * 1024 * 1024 + 4321)) };
   await upload(big);
   const back = new Uint8Array(await (await fetch(BASE + "/api/room/" + room.roomId + "/file/" + big.id)).arrayBuffer());

@@ -1,12 +1,14 @@
 /* Service worker: tiene in cache il guscio dell'app, mai i file degli utenti. */
 
-const VERSION = "darkroom-v1";
+const VERSION = "drewshare-v1";
 const SHELL = [
   "/",
   "/index.html",
   "/styles.css",
   "/app.js",
   "/crypto.js",
+  "/i18n.js",
+  "/recents.js",
   "/zip.js",
   "/manifest.webmanifest",
   "/favicon.svg",

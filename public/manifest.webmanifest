@@ -1,8 +1,8 @@
 {
-  "name": "Darkroom",
-  "short_name": "Darkroom",
-  "description": "Passa foto e file dal telefono al computer. Cifrati end-to-end, originali intatti, cancellati da soli.",
-  "lang": "it",
+  "name": "DrewShare",
+  "short_name": "DrewShare",
+  "description": "Move files from one device to another. End-to-end encrypted, originals untouched, deleted on their own.",
+  "lang": "en",
   "dir": "ltr",
   "start_url": "/",
   "scope": "/",
