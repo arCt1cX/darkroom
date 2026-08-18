@@ -142,10 +142,11 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.015e
   background: linear-gradient(180deg, var(--surface), var(--bg-sunk));
   border: 1px solid var(--line);
   border-radius: var(--r);
-  padding: clamp(22px, 3.4vw, 30px);
+  padding: clamp(20px, 3.4vw, 30px);
   display: flex;
   flex-direction: column;
   gap: 14px;
+  min-width: 0;
 }
 
 .pane-create { border-color: var(--line-warm); box-shadow: 0 0 0 1px rgba(255, 78, 51, .06), 0 24px 60px -40px rgba(255, 78, 51, .5); }
@@ -239,15 +240,18 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.015e
 
 /* ------------------------------------------------------------ code input */
 
-.code-input { display: flex; gap: 6px; }
+.code-input { display: flex; gap: clamp(4px, 1.4vw, 7px); min-width: 0; }
 
 .code-input .sep { width: 10px; align-self: center; height: 1px; background: var(--line-warm); flex: none; }
 
+@media (max-width: 380px) { .code-input .sep { width: 5px; } }
+
 .code-cell {
+  /* larghezza a fisarmonica, altezza fissa: con aspect-ratio le celle si
+     rifiutavano di stringersi e sfondavano lo schermo del telefono */
   flex: 1 1 0;
   min-width: 0;
-  aspect-ratio: 3 / 4;
-  max-height: 62px;
+  height: clamp(46px, 12vw, 62px);
   font-family: var(--mono);
   font-size: clamp(17px, 4.4vw, 22px);
   text-align: center;
