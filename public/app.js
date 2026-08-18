@@ -32,9 +32,14 @@ const state = {
   ttl: 0,
   files: [],
   thumbs: new Map(),
+  blobs: new Map(), // file interi decifrati, per rivederli senza riscaricarli
   clock: null,
   busy: false,
 };
+
+/* Tenere in RAM tutto quello che si e' guardato farebbe esplodere un telefono
+   dopo una decina di foto: si conservano solo gli ultimi. */
+const BLOB_CACHE = 6;
 
 let chosenTtl = 1800;
 
@@ -148,7 +153,7 @@ function buildCodeInput() {
   const readAll = () => cells.map((c) => c.value).join("");
 
   for (let i = 0; i < CODE_LENGTH; i++) {
-    if (i === CODE_LENGTH / 2) {
+    if (i === Math.ceil(CODE_LENGTH / 2)) {
       const sep = document.createElement("span");
       sep.className = "sep";
       box.append(sep);
@@ -264,10 +269,12 @@ async function enterRoom(room, info) {
 }
 
 function leaveRoom() {
+  closeViewer();
   state.room = null;
   state.files = [];
   for (const url of state.thumbs.values()) URL.revokeObjectURL(url);
   state.thumbs.clear();
+  forgetBlobs();
   clearInterval(state.clock);
   $("#grid").innerHTML = "";
   $("#queue").hidden = true;
@@ -282,12 +289,12 @@ function startClock() {
     const left = state.expiresAt - Date.now();
     if (left <= 0) {
       clearInterval(state.clock);
-      toast("La stanza e' scaduta. I file sono stati cancellati.");
+      toast("Stanza scaduta. I file sono stati cancellati.");
       leaveRoom();
       return;
     }
     $("#timer-fill").style.transform = "scaleX(" + Math.min(1, left / (state.ttl * 1000)) + ")";
-    $("#timer-text").textContent = "si dissolve tra " + countdown(left);
+    $("#timer-text").textContent = "scade tra " + countdown(left);
     $(".timer").classList.toggle("urgent", left < 120000);
   };
   tick();
@@ -317,6 +324,14 @@ async function paintFiles(rawFiles) {
     const meta = await openMeta(state.room.key, f.meta);
     files.push({ ...f, name: meta?.n || "file", type: meta?.t || "", hash: meta?.h || "", lm: meta?.lm });
   }
+  const alive = new Set(files.map((f) => f.id));
+  for (const [id, entry] of state.blobs) {
+    if (!alive.has(id)) {
+      URL.revokeObjectURL(entry.url);
+      state.blobs.delete(id);
+    }
+  }
+
   state.files = files;
   renderGrid();
   files.filter((f) => f.thumb && !state.thumbs.has(f.id)).forEach(loadThumb);
@@ -330,10 +345,10 @@ function renderGrid() {
   $("#empty").hidden = state.files.length > 0;
   $("#btn-zip").hidden = state.files.length < 2;
 
-  for (const f of state.files) grid.append(fileCard(f));
+  state.files.forEach((f, i) => grid.append(fileCard(f, i)));
 }
 
-function fileCard(f) {
+function fileCard(f, index) {
   const card = document.createElement("article");
   card.className = "card";
   card.dataset.id = f.id;
@@ -350,6 +365,23 @@ function fileCard(f) {
   } else {
     thumb.innerHTML =
       '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M6 3h7l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M13 3v5h5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>';
+  }
+
+  const open = document.createElement("button");
+  open.type = "button";
+  open.className = "card-open";
+  open.title = "Apri " + f.name;
+  open.append(thumb);
+  open.onclick = () => openViewer(index);
+
+  // Il triangolo sta fuori dalla miniatura: quando l'anteprima arriva e
+  // rimpiazza il contenuto del riquadro, il segno del video resta al suo posto.
+  if (mediaKind(f.type) === "video") {
+    const play = document.createElement("span");
+    play.className = "card-play";
+    play.innerHTML =
+      '<svg viewBox="0 0 24 24" width="34" height="34"><circle cx="12" cy="12" r="11" fill="rgba(6,5,4,.55)"/><path d="M10 8.5l6 3.5-6 3.5z" fill="currentColor"/></svg>';
+    open.append(play);
   }
 
   const body = document.createElement("div");
@@ -393,7 +425,7 @@ function fileCard(f) {
 
   actions.append(get, del);
   body.append(name, meta, actions);
-  card.append(thumb, body, progress);
+  card.append(open, body, progress);
   return card;
 }
 
@@ -447,22 +479,62 @@ function addJob(label) {
   };
 }
 
-async function makeThumb(file) {
-  if (!file.type.startsWith("image/")) return null;
+/** Riduce una sorgente disegnabile a una miniatura JPEG. */
+async function toThumbnail(source, width, height) {
+  const side = 640;
+  const scale = Math.min(1, side / Math.max(width, height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  canvas.getContext("2d").drawImage(source, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.72));
+  return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
+}
+
+/** Per i video si prende un fotogramma poco dopo l'inizio, non il nero iniziale. */
+async function videoThumbnail(file) {
+  const url = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "metadata";
   try {
-    const bitmap = await createImageBitmap(file);
-    const side = 640;
-    const scale = Math.min(1, side / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    bitmap.close();
-    const blob = await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.72));
-    return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
-  } catch {
-    return null; // HEIC e formati esotici: si scarica comunque l'originale
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("timeout")), 10000);
+      video.onloadeddata = () => {
+        const d = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 2;
+        video.currentTime = Math.min(1, d / 4);
+      };
+      video.onseeked = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      video.onerror = () => {
+        clearTimeout(timer);
+        reject(new Error("video"));
+      };
+      video.src = url;
+    });
+    return await toThumbnail(video, video.videoWidth, video.videoHeight);
+  } finally {
+    video.removeAttribute("src");
+    URL.revokeObjectURL(url);
   }
+}
+
+async function makeThumb(file) {
+  try {
+    if (file.type.startsWith("image/")) {
+      const bitmap = await createImageBitmap(file);
+      const out = await toThumbnail(bitmap, bitmap.width, bitmap.height);
+      bitmap.close();
+      return out;
+    }
+    if (file.type.startsWith("video/")) return await videoThumbnail(file);
+  } catch {
+    /* HEIC, codec assenti, formati esotici: si scarica comunque l'originale */
+  }
+  return null;
 }
 
 /** Cifra il file a blocchi, senza mai toccare i byte originali. */
@@ -608,13 +680,12 @@ function save(blob, name) {
 async function downloadOne(f, card) {
   const bar = card.querySelector(".card-progress");
   try {
-    const { chunks, intact } = await fetchAndDecrypt(f, (r) => (bar.style.width = Math.round(r * 100) + "%"));
-    save(new Blob(chunks, { type: f.type || "application/octet-stream" }), f.name);
-    bar.style.width = "0";
-    if (!intact) toast("Attenzione: l'impronta del file non combacia.");
+    const entry = await ensureBlob(f, (r) => (bar.style.width = Math.round(r * 100) + "%"));
+    save(entry.blob, f.name);
   } catch (err) {
-    bar.style.width = "0";
     toast(explain(err));
+  } finally {
+    bar.style.width = "0";
   }
 }
 
@@ -642,6 +713,130 @@ async function downloadAll() {
   }
 }
 
+/* --------------------------------------------------------- visualizzatore */
+
+const viewer = { index: -1, open: false, token: 0 };
+
+function mediaKind(type = "") {
+  if (type.startsWith("image/")) return "image";
+  if (type.startsWith("video/")) return "video";
+  if (type.startsWith("audio/")) return "audio";
+  return "other";
+}
+
+/**
+ * Il file decifrato viene tenuto da parte: riguardare uno scatto o scaricarlo
+ * dopo averlo visto non costa un secondo giro di rete e di AES.
+ */
+async function ensureBlob(f, onProgress) {
+  const cached = state.blobs.get(f.id);
+  if (cached) {
+    state.blobs.delete(f.id);
+    state.blobs.set(f.id, cached); // torna in cima alla fila
+    return cached;
+  }
+
+  const { chunks, intact } = await fetchAndDecrypt(f, onProgress);
+  const blob = new Blob(chunks, { type: f.type || "application/octet-stream" });
+  const entry = { blob, url: URL.createObjectURL(blob), intact };
+
+  state.blobs.set(f.id, entry);
+  while (state.blobs.size > BLOB_CACHE) {
+    const oldest = state.blobs.keys().next().value;
+    URL.revokeObjectURL(state.blobs.get(oldest).url);
+    state.blobs.delete(oldest);
+  }
+
+  if (!intact) toast("Attenzione: l'impronta di " + f.name + " non combacia.");
+  return entry;
+}
+
+function forgetBlobs() {
+  for (const entry of state.blobs.values()) URL.revokeObjectURL(entry.url);
+  state.blobs.clear();
+}
+
+async function openViewer(index) {
+  const f = state.files[index];
+  if (!f) return;
+
+  viewer.index = index;
+  viewer.open = true;
+  const token = ++viewer.token;
+
+  $("#viewer").hidden = false;
+  document.body.style.overflow = "hidden";
+  $("#viewer-name").textContent = f.name;
+  $("#viewer-meta").textContent = humanSize(f.size) + " · " + (index + 1) + " di " + state.files.length;
+  $("#viewer-prev").hidden = state.files.length < 2;
+  $("#viewer-next").hidden = state.files.length < 2;
+
+  const stage = $("#viewer-stage");
+  stage.innerHTML = "";
+  const kind = mediaKind(f.type);
+
+  if (kind === "other") {
+    const note = document.createElement("p");
+    note.className = "viewer-plain";
+    note.textContent = "Questo tipo di file non si puo' mostrare nel browser. Scaricalo per aprirlo.";
+    stage.append(note);
+    return;
+  }
+
+  const wait = document.createElement("div");
+  wait.className = "viewer-wait";
+  wait.innerHTML = '<span>decifratura in corso</span><span class="bar"><i></i></span>';
+  stage.append(wait);
+  const bar = wait.querySelector("i");
+
+  let entry;
+  try {
+    entry = await ensureBlob(f, (r) => (bar.style.width = Math.round(r * 100) + "%"));
+  } catch (err) {
+    if (viewer.token === token) stage.innerHTML = "";
+    toast(explain(err));
+    return;
+  }
+
+  // Nel frattempo l'utente puo' aver chiuso o cambiato file.
+  if (viewer.token !== token || !viewer.open) return;
+
+  stage.innerHTML = "";
+  if (kind === "image") {
+    const img = new Image();
+    img.src = entry.url;
+    img.alt = f.name;
+    stage.append(img);
+  } else if (kind === "video") {
+    const video = document.createElement("video");
+    video.src = entry.url;
+    video.controls = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    stage.append(video);
+  } else {
+    const audio = document.createElement("audio");
+    audio.src = entry.url;
+    audio.controls = true;
+    audio.autoplay = true;
+    stage.append(audio);
+  }
+}
+
+function closeViewer() {
+  viewer.open = false;
+  viewer.token++;
+  $("#viewer").hidden = true;
+  $("#viewer-stage").innerHTML = ""; // ferma anche la riproduzione in corso
+  document.body.style.overflow = "";
+}
+
+function stepViewer(delta) {
+  const n = state.files.length;
+  if (!n) return;
+  openViewer((viewer.index + delta + n) % n);
+}
+
 /* ----------------------------------------------------------------- avvio */
 
 function route() {
@@ -666,6 +861,33 @@ function wire() {
   $("#btn-join").onclick = () => joinRoom(codeInput.read());
   $("#btn-leave").onclick = leaveRoom;
   $("#btn-zip").onclick = downloadAll;
+  $("#viewer-close").onclick = closeViewer;
+  $("#viewer-prev").onclick = () => stepViewer(-1);
+  $("#viewer-next").onclick = () => stepViewer(1);
+
+  $("#viewer-download").onclick = async () => {
+    const f = state.files[viewer.index];
+    if (!f) return;
+    try {
+      save((await ensureBlob(f)).blob, f.name);
+    } catch (err) {
+      toast(explain(err));
+    }
+  };
+
+  document.addEventListener("keydown", (e) => {
+    if (!viewer.open) return;
+    if (e.key === "Escape") closeViewer();
+    else if (e.key === "ArrowLeft") stepViewer(-1);
+    else if (e.key === "ArrowRight") stepViewer(1);
+    else return;
+    e.preventDefault();
+  });
+
+  // Fuori dalla foto si chiude, sui comandi no.
+  $("#viewer-stage").addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) closeViewer();
+  });
 
   $("#btn-copy-code").onclick = async () => {
     await navigator.clipboard.writeText(state.room.code);

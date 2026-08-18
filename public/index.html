@@ -32,7 +32,7 @@
     </svg>
     <span>Darkroom</span>
   </a>
-  <span class="tag">effimero &middot; cifrato end&#8209;to&#8209;end</span>
+  <span class="tag">cifrato end&#8209;to&#8209;end</span>
 </header>
 
 <main id="app">
@@ -40,10 +40,11 @@
   <!-- ------------------------------------------------------------ home -->
   <section class="view" id="view-home">
     <div class="hero">
-      <h1>Le foto passano.<br><em>Non restano.</em></h1>
+      <h1>Trasferimento file temporaneo,<br>cifrato end&#8209;to&#8209;end.</h1>
       <p class="lede">
-        Apri una stanza dal telefono, butta dentro i file, scrivi il codice sul computer.
-        Nessun cavo, nessun account. La stanza si dissolve da sola.
+        Si apre una stanza dal telefono, si caricano foto e video, si recuperano dal
+        computer scrivendo il codice. I file arrivano identici all&rsquo;originale e
+        vengono cancellati alla scadenza scelta.
       </p>
     </div>
 
@@ -51,7 +52,7 @@
       <section class="pane pane-create">
         <span class="pane-num">01</span>
         <h2>Apri una stanza</h2>
-        <p>Scegli quanto deve restare in vita. Alla scadenza tutto viene cancellato dal server.</p>
+        <p>Durata della stanza. Allo scadere i file vengono rimossi dallo storage.</p>
         <div class="ttl" id="ttl" role="radiogroup" aria-label="Durata della stanza"></div>
         <button class="btn primary" id="btn-create" type="button">
           <span>Apri la stanza</span>
@@ -62,7 +63,7 @@
       <section class="pane pane-join">
         <span class="pane-num">02</span>
         <h2>Entra con il codice</h2>
-        <p>Otto caratteri, senza distinguere maiuscole. Puoi anche incollarli tutti insieme.</p>
+        <p>Sei caratteri, maiuscole e minuscole indifferenti. Si possono incollare in blocco.</p>
         <div class="code-input" id="code-input" role="group" aria-label="Codice della stanza"></div>
         <button class="btn" id="btn-join" type="button" disabled>
           <span>Entra</span>
@@ -73,16 +74,16 @@
 
     <ul class="facts">
       <li>
-        <h3>Qualita' identica</h3>
-        <p>I byte originali vengono spediti cosi' come sono. Nessun ridimensionamento, nessuna ricompressione, EXIF intatti.</p>
+        <h3>Nessuna ricompressione</h3>
+        <p>I byte vengono trasferiti invariati: risoluzione, EXIF e profilo colore restano quelli della fotocamera. Un&rsquo;impronta SHA&#8209;256 viene verificata al download.</p>
       </li>
       <li>
-        <h3>Il server e' cieco</h3>
-        <p>Cifratura AES&#8209;256&#8209;GCM nel browser. La chiave nasce dal codice e non lascia mai il dispositivo.</p>
+        <h3>Cifratura sul dispositivo</h3>
+        <p>AES&#8209;256&#8209;GCM con chiave derivata dal codice via PBKDF2. Al server arriva solo un hash del codice: contenuti e nomi dei file restano illeggibili.</p>
       </li>
       <li>
-        <h3>Sparisce da solo</h3>
-        <p>Scaduta la stanza, i file spariscono dallo storage. Puoi anche cancellarli a mano prima.</p>
+        <h3>Cancellazione automatica</h3>
+        <p>Ogni stanza registra la propria scadenza alla creazione e si cancella da sola quando la raggiunge. I singoli file si possono rimuovere prima.</p>
       </li>
     </ul>
   </section>
@@ -112,9 +113,9 @@
         <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
         <path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
       </svg>
-      <strong>Scegli i file</strong>
+      <strong>Scegli foto, video o altri file</strong>
       <span>oppure trascinali qui dentro</span>
-      <small>Vengono cifrati sul dispositivo prima di partire. Gli originali restano intatti.</small>
+      <small>La cifratura avviene sul dispositivo prima dell&rsquo;invio. I file originali non vengono modificati.</small>
     </label>
 
     <section class="queue" id="queue" hidden aria-live="polite"></section>
@@ -134,8 +135,30 @@
 <footer class="foot">
   <span>Darkroom</span>
   <span class="sep">&middot;</span>
-  <span>i file vivono su Cloudflare, cifrati, per il tempo che decidi tu</span>
+  <span>storage cifrato su Cloudflare, per la durata impostata</span>
 </footer>
+
+<div class="viewer" id="viewer" hidden>
+  <div class="viewer-bar">
+    <div class="viewer-title">
+      <span class="viewer-name" id="viewer-name"></span>
+      <span class="viewer-meta" id="viewer-meta"></span>
+    </div>
+    <div class="viewer-tools">
+      <button class="btn ghost tiny" id="viewer-download" type="button">Scarica</button>
+      <button class="btn ghost tiny" id="viewer-close" type="button">Chiudi</button>
+    </div>
+  </div>
+
+  <div class="viewer-stage" id="viewer-stage"></div>
+
+  <button class="viewer-nav prev" id="viewer-prev" type="button" aria-label="Precedente">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <button class="viewer-nav next" id="viewer-next" type="button" aria-label="Successivo">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+</div>
 
 <div id="toasts" class="toasts" aria-live="polite"></div>
 <script type="module" src="/app.js"></script>

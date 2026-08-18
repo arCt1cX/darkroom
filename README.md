@@ -3,8 +3,8 @@
 Passare foto e video dal telefono al computer senza cavi, senza account, senza
 mandarli a se stessi su WhatsApp e ritrovarseli ricompressi.
 
-Apri una stanza dal telefono, ottieni un codice di otto caratteri, ci butti
-dentro i file. Dal computer scrivi lo stesso codice e te li riprendi. Scaduto il
+Apri una stanza dal telefono, ottieni un codice di sei caratteri, ci butti
+dentro foto e video. Dal computer scrivi lo stesso codice e te li riprendi. Scaduto il
 tempo che hai scelto, la stanza si dissolve.
 
 Gira interamente su Cloudflare (Worker + Durable Objects), dentro il piano
@@ -102,11 +102,13 @@ Workers*.
 ## Come si usa
 
 1. **Telefono** — apri il sito, scegli la durata, `Apri la stanza`. Compare un
-   codice tipo `K7QM-3XPD`.
+   codice tipo `K7Q-M3X`.
 2. Tocca `Scegli i file` e prendi le foto dalla galleria. Puoi continuare ad
    aggiungerne finché la stanza è viva.
-3. **Computer** — apri lo stesso sito, scrivi il codice, `Entra`. Trovi tutto lì:
-   `Scarica` per un file, `Scarica tutto (.zip)` per l'intero blocco.
+3. **Computer** — apri lo stesso sito, scrivi il codice, `Entra`. Trovi tutto lì.
+   Clicca su una miniatura per aprire il file a schermo intero: le foto si
+   guardano, i video si riproducono, si passa da uno all'altro con le frecce.
+   `Scarica` prende il singolo file, `Scarica tutto (.zip)` l'intero blocco.
 
 `Copia link` mette negli appunti un indirizzo che contiene già il codice: chi ce
 l'ha entra senza digitare niente. Comodo, ma trattalo come una chiave, perché lo è.
@@ -125,10 +127,21 @@ file esatto, usa la voce *Sfoglia*/*File* del picker, oppure disattiva
 Impostazioni → Foto → *Trasferisci su Mac o PC* → **Mantieni originali**. Su
 Android arrivano sempre i byte originali.
 
-**Anteprime.** Per le immagini viene generata una miniatura JPEG separata, anche
-lei cifrata, giusto per riconoscere i file a colpo d'occhio. L'originale non
-viene toccato. Per gli HEIC il browser spesso non sa disegnare l'anteprima: si
-vede l'icona generica, il download resta perfetto.
+**Video.** Trattati come tutto il resto: byte invariati, nessuna
+transcodifica. La miniatura è un fotogramma preso poco dopo l'inizio, e nel
+visualizzatore partono con i comandi di riproduzione. Il browser deve saper
+decodificare il formato: MP4/H.264 e WebM vanno sempre, qualche registrazione
+esotica no — in quel caso resta il download, intatto.
+
+**Anteprime.** Sia per le foto sia per i video viene generata una miniatura JPEG
+separata, anche lei cifrata, giusto per riconoscere i file a colpo d'occhio.
+L'originale non viene toccato. Per gli HEIC il browser spesso non sa disegnare
+l'anteprima: si vede l'icona generica, il download resta perfetto.
+
+**Visualizzatore.** Aprire un file significa scaricarlo e decifrarlo per intero:
+non c'è modo di mostrare metà di un blocco AES-GCM. Gli ultimi sei file aperti
+restano in memoria, così rivederli o scaricarli dopo averli guardati è
+immediato.
 
 **Memoria.** Cifratura e decifratura passano per la RAM del browser: le foto
 non sono un problema, un video da qualche centinaio di MB su un telefono
@@ -139,10 +152,13 @@ sul corpo delle richieste Workers non si vede mai.
 poco sotto metà di [`src/worker.js`](src/worker.js), tenendo d'occhio i 5 GB di
 storage complessivi del piano Free.
 
-**Sicurezza.** Il codice ha 40 bit di entropia (32^8) e vive al massimo tre
-giorni: indovinarlo a tentativi è impraticabile, e comunque il Worker frena chi
-insiste. Chi ottiene il codice ottiene la stanza — è quello il modello. Se ti
-serve di più, accorcia la durata.
+**Sicurezza.** Il codice ha 30 bit di entropia (32^6 ≈ 1,07 miliardi di
+combinazioni) e vive al massimo tre giorni. Non essendo indovinabile offline —
+serve una richiesta al server per ogni tentativo — la difesa è il costo dei
+tentativi: il Worker conta solo i buchi nell'acqua e ne concede 40 al minuto per
+indirizzo, quindi coprire lo spazio dei codici richiede secoli, mentre chi sta
+usando una stanza davvero non viene mai frenato. Chi ottiene il codice ottiene la
+stanza: è quello il modello. Se serve di più, accorcia la durata.
 
 ---
 

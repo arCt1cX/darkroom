@@ -10,7 +10,7 @@
  */
 
 export const ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; // niente 0 1 I O
-export const CODE_LENGTH = 8;
+export const CODE_LENGTH = 6;
 export const CHUNK_SIZE = 4 * 1024 * 1024; // testo in chiaro per blocco
 export const FRAME_OVERHEAD = 12 + 16; // IV + tag GCM
 
@@ -35,7 +35,10 @@ export function normalizeCode(input) {
 
 export const isCompleteCode = (code) => normalizeCode(code).length === CODE_LENGTH;
 
-export const formatCode = (code) => (code.length > 4 ? code.slice(0, 4) + "-" + code.slice(4) : code);
+export function formatCode(code) {
+  const half = Math.ceil(CODE_LENGTH / 2);
+  return code.length > half ? code.slice(0, half) + "-" + code.slice(half) : code;
+}
 
 function hex(buffer) {
   const view = new Uint8Array(buffer);

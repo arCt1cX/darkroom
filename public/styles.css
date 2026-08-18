@@ -111,11 +111,11 @@ main, .topbar, .foot { position: relative; z-index: 1; }
 
 h1, h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.015em; margin: 0; }
 
-.hero { max-width: 46ch; }
+.hero { max-width: 52ch; }
 
 .hero h1 {
-  font-size: clamp(38px, 8vw, 66px);
-  line-height: 1.04;
+  font-size: clamp(31px, 5.6vw, 50px);
+  line-height: 1.1;
 }
 
 .hero h1 em { font-style: italic; color: var(--safe); }
@@ -529,3 +529,149 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.015e
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* -------------------------------------------------------------- visualizzatore */
+
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(6, 5, 4, .97);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  animation: fade .16s ease-out;
+}
+
+.viewer[hidden] { display: none; }
+
+@keyframes fade { from { opacity: 0; } }
+
+.viewer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px clamp(14px, 3vw, 26px);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.viewer-title { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+
+.viewer-name {
+  font-size: 14px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viewer-meta { font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint); }
+
+.viewer-tools { display: flex; gap: 8px; flex: none; }
+
+.viewer-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: clamp(12px, 2.5vw, 28px);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.viewer-stage img,
+.viewer-stage video {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  border-radius: 6px;
+  background: var(--bg-sunk);
+}
+
+.viewer-stage audio { width: min(520px, 90vw); }
+
+/* Stato di attesa: la decifratura avviene qui, non c'e' niente di gia' pronto
+   da mostrare finche' non e' finita. */
+.viewer-wait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  color: var(--ink-dim);
+  font-size: 13.5px;
+  font-family: var(--mono);
+}
+
+.viewer-wait .bar {
+  width: min(280px, 60vw);
+  height: 2px;
+  background: var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.viewer-wait .bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--safe);
+  transition: width .2s ease-out;
+}
+
+.viewer-plain {
+  text-align: center;
+  color: var(--ink-dim);
+  font-size: 14px;
+  max-width: 34ch;
+  line-height: 1.6;
+}
+
+.viewer-nav {
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line-warm);
+  background: rgba(21, 18, 16, .82);
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+
+.viewer-nav:hover { color: var(--ink); border-color: var(--ink-faint); }
+.viewer-nav[hidden] { display: none; }
+.viewer-nav.prev { left: clamp(8px, 2vw, 22px); }
+.viewer-nav.next { right: clamp(8px, 2vw, 22px); }
+
+/* La miniatura e' cliccabile: apre il file a schermo intero. */
+.card-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  position: relative;
+}
+
+.card-open:hover .card-thumb { opacity: .82; }
+.card-thumb { transition: opacity .15s; }
+
+.card-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  color: var(--ink);
+}
+
+.card-play svg { filter: drop-shadow(0 2px 10px rgba(0, 0, 0, .7)); }

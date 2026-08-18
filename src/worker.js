@@ -66,9 +66,29 @@ function throttle(key, max, windowMs) {
   return true;
 }
 
+function overLimit(key, max) {
+  const b = buckets.get(key);
+  return !!b && Date.now() <= b.reset && b.n >= max;
+}
+
 /* Contatori distinti: altrimenti il traffico normale di una stanza consuma
    anche il budget di apertura delle stanze nuove. */
 const clientKey = (request, scope) => scope + ":" + (request.headers.get("cf-connecting-ip") || "anon");
+
+/**
+ * Con un codice da sei caratteri l'unica difesa contro chi tira a indovinare e'
+ * il costo di ogni tentativo: qui si contano solo i buchi nell'acqua, cosi' chi
+ * usa davvero una stanza non viene mai frenato.
+ */
+const MISS_BUDGET = 40;
+
+async function guarded(env, roomId, request, path) {
+  const key = clientKey(request, "miss");
+  if (overLimit(key, MISS_BUDGET)) return fail("slow_down", 429);
+  const res = await forward(env, roomId, request, path);
+  if (res.status === 404) throttle(key, MISS_BUDGET, 60000);
+  return res;
+}
 
 /* --------------------------------------------------------------- smistamento */
 
@@ -100,17 +120,17 @@ async function route(request, env, url) {
   if (!throttle(clientKey(request, "room"), 900, 60000)) return fail("slow_down", 429);
 
   // GET /api/room/:id
-  if (seg.length === 3 && method === "GET") return forward(env, roomId, request, "/info");
+  if (seg.length === 3 && method === "GET") return guarded(env, roomId, request, "/info");
 
   // POST /api/room/:id/file -> prenota un file, restituisce l'id
-  if (seg[3] === "file" && seg.length === 4 && method === "POST") return forward(env, roomId, request, "/file");
+  if (seg[3] === "file" && seg.length === 4 && method === "POST") return guarded(env, roomId, request, "/file");
 
   if ((seg[3] === "file" || seg[3] === "thumb") && (seg.length === 5 || seg.length === 6)) {
     const fileId = seg[4];
     if (!FILE_ID.test(fileId)) return fail("bad_file_id");
     const tail = seg[5] === "commit" ? "/commit" : "";
     if (seg.length === 6 && !tail) return fail("not_found", 404);
-    return forward(env, roomId, request, "/" + seg[3] + "/" + fileId + tail);
+    return guarded(env, roomId, request, "/" + seg[3] + "/" + fileId + tail);
   }
 
   return fail("not_found", 404);
