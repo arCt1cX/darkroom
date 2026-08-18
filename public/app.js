@@ -12,13 +12,11 @@ import {
   openMeta,
   randomCode,
   sealMeta,
-  storedSize,
 } from "./crypto.js";
 import { buildZip, uniqueNames } from "./zip.js";
 
 const $ = (sel) => document.querySelector(sel);
 
-const SINGLE_SHOT_LIMIT = 90 * 1024 * 1024;
 const TTLS = [
   { s: 900, label: "15 min" },
   { s: 1800, label: "30 min" },
@@ -110,6 +108,9 @@ async function api(path, options) {
 
 const ERRORS = {
   room_not_found: "Stanza inesistente o gia' scaduta.",
+  file_too_large: "File troppo grande per una stanza.",
+  incomplete_upload: "Trasferimento interrotto, riprova.",
+  file_not_found: "Il file non c'e' piu'.",
   room_exists: "Codice gia' in uso, riprova.",
   room_full: "Stanza piena.",
   room_quota: "Spazio della stanza esaurito.",
@@ -503,16 +504,29 @@ async function uploadFile(file) {
       "x-dr-thumb": thumbData ? "1" : "0",
     };
 
-    const total = storedSize(file.size, CHUNK_SIZE);
-    const track = (r) => job.set("invio", 0.4 + r * 0.58);
-    let fileId;
+    // Il flusso cifrato parte a pezzi: la stanza li deposita a blocchi e li
+    // rimette in fila da sola. L'offset e' assoluto, quindi un pezzo rispedito
+    // dopo un errore di rete riscrive lo stesso posto invece di duplicarsi.
+    const cipher = new Blob(frames);
+    const start = await send("POST", "/api/room/" + room.roomId + "/file", null, {
+      ...headers,
+      "x-dr-stored": String(cipher.size),
+    });
+    const fileId = start.fileId;
 
-    if (total <= SINGLE_SHOT_LIMIT) {
-      const res = await send("PUT", "/api/room/" + room.roomId + "/file", new Blob(frames), headers, track);
-      fileId = res.fileId;
-    } else {
-      fileId = await uploadMultipart(room, frames, headers, total, track);
+    for (let offset = 0; offset < cipher.size; offset += start.partSize) {
+      const slice = cipher.slice(offset, Math.min(offset + start.partSize, cipher.size));
+      const base = offset;
+      await send(
+        "PUT",
+        "/api/room/" + room.roomId + "/file/" + fileId + "?offset=" + offset,
+        slice,
+        {},
+        (r) => job.set("invio", 0.4 + ((base + slice.size * r) / cipher.size) * 0.55)
+      );
     }
+
+    await send("POST", "/api/room/" + room.roomId + "/file/" + fileId + "/commit", null, {});
 
     if (thumbData) {
       job.set("anteprima", 0.99);
@@ -529,40 +543,6 @@ async function uploadFile(file) {
   }
 }
 
-async function uploadMultipart(room, frames, headers, total, track) {
-  const start = await send("POST", "/api/room/" + room.roomId + "/mpu", null, {
-    ...headers,
-    "x-dr-stored": String(total),
-  });
-
-  const framesPerPart = Math.max(1, Math.floor(start.partSize / (CHUNK_SIZE + FRAME_OVERHEAD)));
-  const parts = [];
-  let sent = 0;
-
-  for (let i = 0, part = 1; i < frames.length; i += framesPerPart, part++) {
-    const slice = frames.slice(i, i + framesPerPart);
-    const bytes = slice.reduce((n, f) => n + f.length, 0);
-    const base = sent;
-    const res = await send(
-      "PUT",
-      "/api/room/" + room.roomId + "/mpu/" + start.fileId + "?uploadId=" + encodeURIComponent(start.uploadId) + "&part=" + part,
-      new Blob(slice),
-      {},
-      (r) => track((base + bytes * r) / total)
-    );
-    parts.push({ partNumber: res.partNumber, etag: res.etag });
-    sent += bytes;
-  }
-
-  await api("/room/" + room.roomId + "/mpu/" + start.fileId, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ uploadId: start.uploadId, parts }),
-  });
-
-  return start.fileId;
-}
-
 async function handleFiles(list) {
   const files = Array.from(list).filter((f) => f.size >= 0);
   if (!files.length) return;
@@ -577,7 +557,7 @@ async function fetchAndDecrypt(f, onProgress) {
   const res = await fetch("/api/room/" + state.room.roomId + "/file/" + f.id);
   if (!res.ok) throw new Error("http_" + res.status);
 
-  const expected = Number(res.headers.get("content-length") || 0);
+  const expected = Number(res.headers.get("x-dr-stored") || res.headers.get("content-length") || 0);
   const reader = res.body.getReader();
   const blocks = [];
   let received = 0;

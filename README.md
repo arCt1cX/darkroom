@@ -7,7 +7,8 @@ Apri una stanza dal telefono, ottieni un codice di otto caratteri, ci butti
 dentro i file. Dal computer scrivi lo stesso codice e te li riprendi. Scaduto il
 tempo che hai scelto, la stanza si dissolve.
 
-Gira interamente su Cloudflare (Worker + R2), dentro il piano gratuito.
+Gira interamente su Cloudflare (Worker + Durable Objects), dentro il piano
+gratuito e **senza metodo di pagamento**.
 
 ---
 
@@ -30,30 +31,45 @@ chiave = PBKDF2(CODICE, salt = SHA-256("darkroom-salt-v1|" + CODICE), 250k)
 Il server riceve solo `roomId`, e da un hash non si torna indietro al codice.
 Contenuti, nomi dei file, tipo MIME e impronte viaggiano cifrati in
 AES-256-GCM a blocchi da 4 MiB, ognuno con il proprio IV e con l'indice del
-blocco come dato autenticato (così non si possono riordinare i pezzi). Su R2
-restano blob opachi.
+blocco come dato autenticato (così non si possono riordinare i pezzi). Nello
+storage restano blob opachi.
 
-**Sparisce da solo.** La scadenza la scegli tu (da 15 minuti a 3 giorni). Il
-Worker rifiuta le stanze scadute all'istante, e un cron ogni ora ripulisce lo
-storage.
+**Sparisce da solo.** La scadenza la scegli tu (da 15 minuti a 3 giorni). Ogni
+stanza programma un `alarm()` all'ora esatta della propria morte: scatta da
+sola e cancella tutto, senza cron da aspettare. Chi arriva dopo trova 404.
 
 ---
 
+## Dove finiscono i file
+
+Ogni stanza è una **Durable Object** con storage SQLite: un oggetto per codice,
+creato al volo. Il flusso cifrato viene spezzato in blocchi da 96 KiB (sotto il
+limite di 128 KiB per valore) e riletto in ordine in streaming.
+
+Perché non R2: attivarlo richiede un metodo di pagamento sulla dashboard, anche
+restando dentro il piano gratuito. Le Durable Objects sono incluse nel piano
+Free dal 2025 e non chiedono nulla. In cambio danno pure consistenza forte —
+niente propagazione da aspettare fra il telefono che carica e il computer che
+guarda — e la scadenza precisa via `alarm()`.
+
+Limiti attuali del piano Free, per orientarsi: 5 GB di storage complessivo,
+100.000 richieste al giorno, 100.000 righe scritte al giorno (una riga = un
+blocco da 96 KiB, quindi una foto da 5 MB ne consuma ~55). Per un uso personale
+sono numeri larghissimi.
+
 ## Deploy su Cloudflare
 
-Serve un account Cloudflare gratuito. Per attivare R2 la dashboard chiede un
-metodo di pagamento anche sul piano gratuito: sotto le soglie del free tier
-(10 GB di storage, 1 milione di operazioni di scrittura al mese, traffico in
-uscita **gratuito**) non addebita nulla.
+Serve solo un account Cloudflare gratuito.
 
 ```bash
 npm install
 npx wrangler login
-npx wrangler r2 bucket create darkroom-files
 npx wrangler deploy
 ```
 
-Fine. Wrangler stampa l'indirizzo, del tipo
+Fine — la Durable Object nasce da sola con la migrazione dichiarata in
+`wrangler.jsonc`, non c'è niente da creare a mano. Wrangler stampa l'indirizzo,
+del tipo
 `https://darkroom.<tuo-sottodominio>.workers.dev`. La PWA e l'API stanno nello
 stesso Worker: niente progetto Pages separato da collegare.
 
@@ -114,13 +130,14 @@ lei cifrata, giusto per riconoscere i file a colpo d'occhio. L'originale non
 viene toccato. Per gli HEIC il browser spesso non sa disegnare l'anteprima: si
 vede l'icona generica, il download resta perfetto.
 
-**Memoria.** Cifratura e decifratura passano per la RAM del browser: file da
-qualche centinaio di MB vanno bene, oltre il giga su un telefono modesto meglio
-non insistere. Oltre 90 MiB l'upload passa automaticamente in multipart da
-32 MiB per aggirare il limite di 100 MB sul corpo delle richieste Workers.
+**Memoria.** Cifratura e decifratura passano per la RAM del browser: le foto
+non sono un problema, un video da qualche centinaio di MB su un telefono
+modesto sì. L'upload parte comunque a pezzi da 6 MiB, così il limite di 100 MB
+sul corpo delle richieste Workers non si vede mai.
 
-**Limiti.** 300 file e 8 GiB per stanza, 5 GiB per singolo file. Si cambiano in
-cima a [`src/worker.js`](src/worker.js).
+**Limiti.** 300 file e 1 GiB per stanza, 300 MB per singolo file. Si cambiano
+poco sotto metà di [`src/worker.js`](src/worker.js), tenendo d'occhio i 5 GB di
+storage complessivi del piano Free.
 
 **Sicurezza.** Il codice ha 40 bit di entropia (32^8) e vive al massimo tre
 giorni: indovinarlo a tentativi è impraticabile, e comunque il Worker frena chi
@@ -132,7 +149,7 @@ serve di più, accorcia la durata.
 ## Sviluppo
 
 ```bash
-npm run dev      # wrangler dev, R2 simulato in locale
+npm run dev      # wrangler dev, storage simulato in locale
 npm run icons    # rigenera le icone PNG della PWA
 ```
 
@@ -144,12 +161,12 @@ node tools/e2e-test.mjs http://127.0.0.1:8787
 
 Cifra, carica, riscarica, decifra e confronta i byte uno per uno, prova la
 chiave sbagliata, i metadati, lo zip e la cancellazione. Con
-`DARKROOM_TEST_MPU=1` aggiunge un file da 100 MB per esercitare il multipart.
+`DARKROOM_TEST_BIG=1` aggiunge un file da 60 MB spedito in undici pezzi.
 
 ## Struttura
 
 ```
-src/worker.js        API e cron. Vede solo blob opachi.
+src/worker.js        smistamento + la Durable Object. Vede solo blob opachi.
 public/index.html    la pagina, unica
 public/app.js        stanze, upload, download, anteprime
 public/crypto.js     derivazione della chiave e cifratura a blocchi

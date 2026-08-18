@@ -113,29 +113,47 @@ const samples = [
   { name: "vuoto.txt", type: "text/plain", bytes: new Uint8Array(0) },
 ];
 
-for (const sample of samples) {
+async function upload(sample) {
   const { frames, hash } = await encryptAll(sample.bytes, room.key);
-  const stored = frames.reduce((n, f) => n + f.length, 0);
+  const cipher = concat(frames);
   check(
     sample.name + ": dimensione cifrata prevista",
-    stored === C.storedSize(sample.bytes.length, C.CHUNK_SIZE),
-    stored + " vs " + C.storedSize(sample.bytes.length, C.CHUNK_SIZE)
+    cipher.length === C.storedSize(sample.bytes.length, C.CHUNK_SIZE),
+    cipher.length + " vs " + C.storedSize(sample.bytes.length, C.CHUNK_SIZE)
   );
 
   const meta = await C.sealMeta(room.key, { n: sample.name, t: sample.type, h: hash, lm: Date.now() });
-  const res = await call("/api/room/" + room.roomId + "/file", {
-    method: "PUT",
+  const start = await call("/api/room/" + room.roomId + "/file", {
+    method: "POST",
     headers: {
       "x-dr-meta": meta,
       "x-dr-size": String(sample.bytes.length),
       "x-dr-chunk": String(C.CHUNK_SIZE),
+      "x-dr-stored": String(cipher.length),
       "x-dr-thumb": "0",
     },
-    body: concat(frames),
   });
-  sample.id = res.fileId;
-  check(sample.name + ": caricato", !!res.fileId);
+
+  let parts = 0;
+  for (let offset = 0; offset < cipher.length; offset += start.partSize) {
+    await call("/api/room/" + room.roomId + "/file/" + start.fileId + "?offset=" + offset, {
+      method: "PUT",
+      body: cipher.subarray(offset, Math.min(offset + start.partSize, cipher.length)),
+    });
+    parts++;
+  }
+
+  // Prima del commit il file non deve comparire a nessuno.
+  const hidden = await call("/api/room/" + room.roomId);
+  check(sample.name + ": invisibile finche' non e' completo", !hidden.files.some((f) => f.id === start.fileId));
+
+  await call("/api/room/" + room.roomId + "/file/" + start.fileId + "/commit", { method: "POST" });
+  check(sample.name + ": caricato in " + parts + " pezzi", true);
+  sample.id = start.fileId;
+  sample.hash = hash;
 }
+
+for (const sample of samples) await upload(sample);
 
 const listing = await call("/api/room/" + room.roomId);
 check("la lista contiene tutti i file", listing.files.length === samples.length, String(listing.files.length));
@@ -179,45 +197,14 @@ check("zip: firma locale", zipBytes.readUInt32LE(0) === 0x04034b50);
 check("zip: coda centrale", zipBytes.includes(Buffer.from([0x50, 0x4b, 0x05, 0x06])));
 
 // Percorso multipart: si attiva solo oltre i 90 MiB, quindi e' opzionale.
-if (process.env.DARKROOM_TEST_MPU === "1") {
-  const big = new Uint8Array(randomBytes(100 * 1024 * 1024 + 4321));
-  const { frames, hash } = await encryptAll(big, room.key);
-  const total = frames.reduce((n, f) => n + f.length, 0);
-  const meta = await C.sealMeta(room.key, { n: "grande.bin", t: "application/octet-stream", h: hash, lm: Date.now() });
-
-  const start = await call("/api/room/" + room.roomId + "/mpu", {
-    method: "POST",
-    headers: {
-      "x-dr-meta": meta,
-      "x-dr-size": String(big.length),
-      "x-dr-chunk": String(C.CHUNK_SIZE),
-      "x-dr-thumb": "0",
-      "x-dr-stored": String(total),
-    },
-  });
-
-  const perPart = Math.max(1, Math.floor(start.partSize / (C.CHUNK_SIZE + C.FRAME_OVERHEAD)));
-  const parts = [];
-  for (let i = 0, n = 1; i < frames.length; i += perPart, n++) {
-    const res = await call(
-      "/api/room/" + room.roomId + "/mpu/" + start.fileId + "?uploadId=" + encodeURIComponent(start.uploadId) + "&part=" + n,
-      { method: "PUT", body: concat(frames.slice(i, i + perPart)) }
-    );
-    parts.push({ partNumber: res.partNumber, etag: res.etag });
-  }
-
-  await call("/api/room/" + room.roomId + "/mpu/" + start.fileId, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ uploadId: start.uploadId, parts }),
-  });
-
-  const back = new Uint8Array(await (await fetch(BASE + "/api/room/" + room.roomId + "/file/" + start.fileId)).arrayBuffer());
+if (process.env.DARKROOM_TEST_BIG === "1") {
+  const big = { name: "grande.bin", type: "application/octet-stream", bytes: new Uint8Array(randomBytes(60 * 1024 * 1024 + 4321)) };
+  await upload(big);
+  const back = new Uint8Array(await (await fetch(BASE + "/api/room/" + room.roomId + "/file/" + big.id)).arrayBuffer());
   const round = await decryptAll(back, C.CHUNK_SIZE, room.key);
-  const plain = concat(round.parts);
-  check("multipart: " + parts.length + " parti, byte identici", Buffer.compare(Buffer.from(plain), Buffer.from(big)) === 0);
-  check("multipart: impronta verificata", round.hash === hash);
-  await call("/api/room/" + room.roomId + "/file/" + start.fileId, { method: "DELETE" });
+  check("file grande: byte identici", Buffer.compare(Buffer.from(concat(round.parts)), Buffer.from(big.bytes)) === 0);
+  check("file grande: impronta verificata", round.hash === big.hash);
+  await call("/api/room/" + room.roomId + "/file/" + big.id, { method: "DELETE" });
 }
 
 // Cancellazione
