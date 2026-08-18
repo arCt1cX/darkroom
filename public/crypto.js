@@ -2,17 +2,15 @@
  * DrewShare - crittografia lato client.
  *
  * Il codice della stanza e' insieme indirizzo e chiave:
- *   roomId = SHA-256("darkroom-room-v1|" + CODICE)      -> va al server
- *   key    = PBKDF2(CODICE, SHA-256("darkroom-salt-v1|" + CODICE), 250k)
+ *   roomId = SHA-256("drewshare-room-v1|" + CODICE)      -> va al server
+ *   key    = PBKDF2(CODICE, SHA-256("drewshare-salt-v1|" + CODICE), 250k)
  *
  * Il server riceve solo roomId: da li' non si torna al codice, quindi non si
  * torna alla chiave. Chi non ha il codice vede blob opachi e nient'altro.
  *
- * Le due stringhe "darkroom-*-v1" sono etichette di dominio congelate: entrano
- * nell'hash, quindi cambiarle cambierebbe l'indirizzo e la chiave di ogni
- * stanza. Le stanze aperte prima di un rinomino diventerebbero irraggiungibili
- * e i vecchi client in cache non troverebbero piu' quelle nuove. Restano
- * com'erano: non compaiono da nessuna parte nell'interfaccia.
+ * Le due stringhe entrano nell'hash: cambiarle cambia l'indirizzo e la chiave
+ * di ogni stanza, quindi si toccano solo insieme a un cambio di Worker, che
+ * comunque riparte con un namespace Durable Objects vuoto.
  */
 
 export const ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; // niente 0 1 I O
@@ -60,8 +58,8 @@ export async function deriveRoom(rawCode) {
   const code = normalizeCode(rawCode);
   if (code.length !== CODE_LENGTH) throw new Error("codice incompleto");
 
-  const roomId = hex(await sha256(te.encode("darkroom-room-v1|" + code)));
-  const salt = await sha256(te.encode("darkroom-salt-v1|" + code));
+  const roomId = hex(await sha256(te.encode("drewshare-room-v1|" + code)));
+  const salt = await sha256(te.encode("drewshare-salt-v1|" + code));
 
   const material = await crypto.subtle.importKey("raw", te.encode(code), "PBKDF2", false, ["deriveKey"]);
   const key = await crypto.subtle.deriveKey(

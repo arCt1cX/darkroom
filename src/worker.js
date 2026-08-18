@@ -3,7 +3,7 @@
  *
  * Il server non vede mai il codice della stanza, ne' i nomi dei file, ne' i byte
  * in chiaro. Riceve solo:
- *   roomId = SHA-256("darkroom-room-v1|" + CODICE)   (etichetta congelata)
+ *   roomId = SHA-256("drewshare-room-v1|" + CODICE)
  * mentre la chiave AES deriva dallo stesso CODICE via PBKDF2, lato client.
  * Qui si maneggiano solo blob opachi.
  *

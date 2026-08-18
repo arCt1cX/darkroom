@@ -1,8 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "darkroom",
+  // Il nome decide anche il sottodominio: drewshare.<account>.workers.dev
+  "name": "drewshare",
   "main": "src/worker.js",
   "compatibility_date": "2025-06-01",
+  "workers_dev": true,
 
   // PWA statica servita dallo stesso Worker (niente progetto Pages separato)
   "assets": {

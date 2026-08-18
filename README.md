@@ -31,13 +31,9 @@ download: se un byte fosse cambiato, l'app lo direbbe.
 browser. Da lì si ricavano due cose diverse:
 
 ```
-roomId = SHA-256("darkroom-room-v1|" + CODICE)      -> questo va al server
-chiave = PBKDF2(CODICE, salt = SHA-256("darkroom-salt-v1|" + CODICE), 250k)
+roomId = SHA-256("drewshare-room-v1|" + CODICE)      -> questo va al server
+chiave = PBKDF2(CODICE, salt = SHA-256("drewshare-salt-v1|" + CODICE), 250k)
 ```
-
-(Le etichette `darkroom-*-v1` sono un residuo del nome precedente, congelato di
-proposito: entrano nell'hash, quindi cambiarle renderebbe irraggiungibili le
-stanze già aperte. Non compaiono da nessuna parte nell'interfaccia.)
 
 Il server riceve solo `roomId`, e da un hash non si torna indietro al codice.
 Contenuti, nomi dei file, tipo MIME e impronte viaggiano cifrati in
@@ -81,10 +77,18 @@ npx wrangler deploy
 Fine — la Durable Object nasce da sola con la migrazione dichiarata in
 `wrangler.jsonc`, non c'è niente da creare a mano. Wrangler stampa l'indirizzo,
 del tipo
-`https://darkroom.<tuo-sottodominio>.workers.dev` — il Worker si chiama ancora
-`darkroom` in `wrangler.jsonc`, e cambiargli nome vorrebbe dire crearne uno
-nuovo e rifare dominio e route, quindi è rimasto com'era. La PWA e l'API stanno
-nello stesso Worker: niente progetto Pages separato da collegare.
+`https://drewshare.<tuo-sottodominio>.workers.dev`: il sottodominio segue il
+campo `name` di `wrangler.jsonc`. La PWA e l'API stanno nello stesso Worker:
+niente progetto Pages separato da collegare.
+
+> **Se rinomini il Worker.** Cambiare `name` non rinomina quello vecchio: ne
+> crea uno nuovo, con un namespace Durable Objects vuoto. Le stanze aperte
+> sull'indirizzo precedente restano lì fino alla loro scadenza e poi muoiono da
+> sole, ma non sono raggiungibili dal nuovo. Il vecchio Worker va cancellato a
+> mano da Workers & Pages, e route o domini personalizzati vanno rifatti. Per
+> lo stesso motivo le etichette `drewshare-*-v1` qui sopra si toccano solo in
+> quell'occasione: entrano nell'hash, quindi cambiarle sposta indirizzo e
+> chiave di ogni stanza.
 
 ### Dominio tuo (facoltativo)
 
@@ -101,7 +105,7 @@ e rilancia `npx wrangler deploy`.
 Due strade, scegline una.
 
 **Workers Builds** (dalla dashboard, zero configurazione): Workers & Pages →
-`darkroom` → Settings → Builds → Connect repository, scegli questo repo. Da lì
+`drewshare` → Settings → Builds → Connect repository, scegli questo repo. Da lì
 in poi ogni push su `main` fa il deploy.
 
 **GitHub Actions**: il repo contiene già
