@@ -41,7 +41,7 @@ AES-256-GCM a blocchi da 4 MiB, ognuno con il proprio IV e con l'indice del
 blocco come dato autenticato (così non si possono riordinare i pezzi). Nello
 storage restano blob opachi.
 
-**Sparisce da solo.** La scadenza la scegli tu (da 15 minuti a 3 giorni). Ogni
+**Sparisce da solo.** La scadenza la scegli tu (da 15 minuti a 7 giorni). Ogni
 stanza programma un `alarm()` all'ora esatta della propria morte: scatta da
 sola e cancella tutto, senza cron da aspettare. Chi arriva dopo trova 404.
 
@@ -183,12 +183,15 @@ poco sotto metà di [`src/worker.js`](src/worker.js), tenendo d'occhio i 5 GB di
 storage complessivi del piano Free.
 
 **Sicurezza.** Il codice ha 30 bit di entropia (32^6 ≈ 1,07 miliardi di
-combinazioni) e vive al massimo tre giorni. Non essendo indovinabile offline —
+combinazioni) e vive al massimo sette giorni. Non essendo indovinabile offline —
 serve una richiesta al server per ogni tentativo — la difesa è il costo dei
 tentativi: il Worker conta solo i buchi nell'acqua e ne concede 40 al minuto per
-indirizzo, quindi coprire lo spazio dei codici richiede secoli, mentre chi sta
-usando una stanza davvero non viene mai frenato. Chi ottiene il codice ottiene la
-stanza: è quello il modello. Se serve di più, accorcia la durata.
+indirizzo, cioè ~403.000 in una settimana intera, meno dello 0,04% dello spazio
+dei codici; passarlo tutto da un solo indirizzo vorrebbe dire una cinquantina
+d'anni. Chi sta usando una stanza davvero non viene mai frenato. Chi ottiene il
+codice ottiene la stanza: è quello il modello, e una settimana è una finestra
+sette volte più larga di prima — se il contenuto è delicato, scegli una durata
+corta.
 
 ---
 

@@ -20,7 +20,7 @@ import { forgetRoom, recentRooms, rememberRoom } from "./recents.js";
 const $ = (sel) => document.querySelector(sel);
 
 /* Le etichette vivono nel dizionario: qui restano solo i secondi. */
-const TTLS = [900, 1800, 3600, 21600, 86400, 259200];
+const TTLS = [900, 1800, 3600, 21600, 86400, 259200, 604800];
 
 const state = {
   room: null, // { code, roomId, key }

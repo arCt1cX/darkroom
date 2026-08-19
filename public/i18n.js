@@ -105,6 +105,7 @@ const DICT = {
     "ttl.21600": "6 ore",
     "ttl.86400": "24 ore",
     "ttl.259200": "3 giorni",
+    "ttl.604800": "7 giorni",
 
     "err.room_not_found": "Stanza inesistente o gia’ scaduta.",
     "err.file_too_large": "File troppo grande per una stanza.",
@@ -209,6 +210,7 @@ const DICT = {
     "ttl.21600": "6 hours",
     "ttl.86400": "24 hours",
     "ttl.259200": "3 days",
+    "ttl.604800": "7 days",
 
     "err.room_not_found": "No such room, or it has already expired.",
     "err.file_too_large": "That file is too large for a room.",

@@ -12,7 +12,7 @@
  * cancella tutto da solo. Il Worker qui davanti fa solo da smistamento.
  */
 
-const TTL_CHOICES = [900, 1800, 3600, 6 * 3600, 24 * 3600, 72 * 3600];
+const TTL_CHOICES = [900, 1800, 3600, 6 * 3600, 24 * 3600, 72 * 3600, 7 * 24 * 3600];
 
 const HEX64 = /^[0-9a-f]{64}$/;
 const FILE_ID = /^[0-9a-z]{22}$/;
